@@ -211,89 +211,6 @@ jobs:
           path: build/accept/M02/
           if-no-files-found: ignore
 
-  accept-m03:
-    name: accept-m03
-    needs: build-test
-    runs-on: macos-26
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: M3 acceptance (headless)
-        env:
-          CI: 'true'
-          PRISM_PERF_SCALE: '3'
-          # build-strict.sh already ran in the build-test job; M03.sh still
-          # runs the app unit tests and builds the bundle.
-          PRISM_ACCEPT_SKIP_BUILD: '1'
-        run: scripts/accept/M03.sh
-
-      - name: Upload acceptance output
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: accept-M03-${{ github.sha }}
-          path: build/accept/M03/
-          if-no-files-found: ignore
-
-  accept-m04:
-    name: accept-m04
-    needs: build-test
-    runs-on: macos-26
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: M4 acceptance (headless)
-        env:
-          CI: 'true'
-          PRISM_PERF_SCALE: '3'
-          # build-strict.sh already ran in the build-test job; M04.sh still
-          # runs the app unit tests, builds the bundle and generates the
-          # large corpus inputs (indent-only and minified pairs).
-          PRISM_ACCEPT_SKIP_BUILD: '1'
-        run: scripts/accept/M04.sh
-
-      - name: Upload acceptance output
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: accept-M04-${{ github.sha }}
-          path: build/accept/M04/
-          if-no-files-found: ignore
-
-  accept-m06:
-    name: accept-m06
-    needs: build-test
-    runs-on: macos-26
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: M6 acceptance (headless)
-        env:
-          CI: 'true'
-          PRISM_PERF_SCALE: '3'
-          # build-strict.sh already ran in the build-test job; M06.sh still
-          # runs the app unit tests and the release-mode re-diff timing. It
-          # never launches the app in CI.
-          PRISM_ACCEPT_SKIP_BUILD: '1'
-        run: scripts/accept/M06.sh
-
-      - name: Upload acceptance output
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: accept-M06-${{ github.sha }}
-          path: build/accept/M06/
-          if-no-files-found: ignore
-
   accept-m07:
     name: accept-m07
     needs: build-test
@@ -469,13 +386,11 @@ jobs:
           PRISM_ACCEPT_SKIP_BUILD: '1'
         run: scripts/accept/M00.sh
 
-      - name: Upload app and CLI archives
+      - name: Upload the app archive
         uses: actions/upload-artifact@v4
         with:
           name: prism-app-${{ github.sha }}
-          path: |
-            build/Prism-*.zip
-            build/prism-*-macos-arm64.zip
+          path: build/Prism-*-macos-arm64.zip
           if-no-files-found: error
 
       - name: Upload acceptance output

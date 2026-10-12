@@ -41,7 +41,7 @@ The `prism` command accepts the same options as `ksdiff` for compatibility.
 
 Prism runs on macOS 14 (Sonoma) or later, on Apple silicon Macs.
 
-1. Download `Prism-<version>.zip` from the
+1. Download `Prism-<version>-macos-arm64.zip` from the
    [latest release](https://github.com/pditommaso/prism-diff/releases/latest).
 2. Unzip it and move `Prism.app` to `/Applications`.
 3. Open it once as described below.
@@ -142,8 +142,7 @@ scripts/bundle.sh               # assemble and ad-hoc sign build/Prism.app
 open build/Prism.app
 ```
 
-`scripts/bundle.sh` also writes `build/Prism-<version>.zip` and
-`build/prism-<version>-macos-arm64.zip` (the standalone `prism` tool).
+`scripts/bundle.sh` also writes `build/Prism-<version>-macos-arm64.zip`.
 `scripts/ci/build-strict.sh` builds with warnings treated as errors, and
 `scripts/accept/` holds the acceptance scripts of each milestone
 (`CI=true scripts/accept/MNN.sh` runs only their headless checks;

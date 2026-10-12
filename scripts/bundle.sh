@@ -12,9 +12,7 @@
 #   Prism.app/Contents/Resources/AppIcon.icns
 #
 # Everything is signed ad hoc with the hardened runtime, inside out, then the
-# bundle is verified and zipped to build/Prism-<version>.zip. The signed
-# prism helper is also archived on its own, for use without the app, as
-# build/prism-<version>-macos-arm64.zip (a single file named prism).
+# bundle is verified and zipped to build/Prism-<version>-macos-arm64.zip.
 # The icon is regenerated only when scripts/tools/make-icon.swift changes.
 #
 # Version: the VERSION file (CFBundleShortVersionString). Build number:
@@ -49,8 +47,7 @@ is_semver "$VERSION" || die "VERSION '$VERSION' is not semver"
 [[ "$BUILD" =~ ^[0-9]+(\.[0-9]+)*$ ]] || die "PRISM_BUILD_NUMBER '$BUILD' is not numeric"
 export PRISM_BUILD_NUMBER="$BUILD"
 readonly VERSION BUILD
-readonly ZIP="$BUILD_DIR/Prism-$VERSION.zip"
-readonly CLI_ZIP="$BUILD_DIR/prism-$VERSION-macos-arm64.zip"
+readonly ZIP="$BUILD_DIR/Prism-$VERSION-macos-arm64.zip"
 
 # 1. Release binaries.
 log "building release binaries ($VERSION, build $BUILD)"
@@ -104,14 +101,5 @@ codesign --verify --deep --strict --verbose=2 "$APP" >&2
 rm -f "$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP"
 log "wrote $ZIP"
-
-# 6. Standalone CLI archive: the signed helper, alone at the top level.
-cli_stage="$BUILD_DIR/cli-stage"
-rm -rf "$cli_stage" "$CLI_ZIP"
-mkdir -p "$cli_stage"
-cp -p "$APP/Contents/Helpers/prism" "$cli_stage/prism"
-ditto -c -k "$cli_stage" "$CLI_ZIP"
-rm -rf "$cli_stage"
-log "wrote $CLI_ZIP"
 
 echo "$APP"

@@ -82,8 +82,8 @@ which runs the same way locally and in GitHub Actions.
      scripts.
   4. `scripts/bundle.sh`, signature verification, and a check that every
      version string equals `VERSION`.
-  5. Packaging into `dist/`: `Prism-<version>.zip`,
-     `prism-<version>-macos-arm64.zip`, `SHA256SUMS`, `release-notes.md`.
+  5. Packaging into `dist/`: `Prism-<version>-macos-arm64.zip` (the app, with
+     the `prism` command inside), `SHA256SUMS`, `release-notes.md`.
   6. Publishing: tags `v<version>`, pushes that tag, and creates the GitHub
      release with the `dist/` files.
 - **Rehearsal:** `scripts/release.sh --dry-run` runs every step except

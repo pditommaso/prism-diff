@@ -78,7 +78,7 @@ editors and scripts (ksdiff-compatible options), and runs the headless
   all tests, the clean-room guards, the headless acceptance scripts,
   Prism.app ad-hoc signed with the hardened runtime and checked with
   `codesign --verify --deep --strict` and for its version strings, then
-  `dist/Prism-<version>.zip`, the standalone `prism` zip, SHA256SUMS and
+  `dist/Prism-<version>-macos-arm64.zip`, SHA256SUMS and
   release notes from this section, with file times set to the commit
   time. Without `--dry-run` it tags `v<version>`, pushes the tag and
   publishes the GitHub release. CI runs it for a push to master whose

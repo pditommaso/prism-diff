@@ -238,25 +238,6 @@ survives_closed_output() {
     fails_cleanly "$status" "broken pipe, SIGPIPE ignored"
 }
 
-# cli_zip_ok: the standalone CLI archive holds exactly one file, prism,
-# which is signed, arm64 only and prints VERSION.
-cli_zip_ok() {
-    local zip="$ACCEPT_ROOT/build/prism-$VERSION-macos-arm64.zip" dir rc=0 listing
-    [[ -s "$zip" ]] || { echo "missing: $zip"; return 1; }
-    dir="$(mktemp -d)" || return 1
-    ditto -x -k "$zip" "$dir" || rc=1
-    listing=$(cd "$dir" && find . -type f | sort)
-    echo "contents: $listing"
-    if (( rc == 0 )) && [[ "$listing" == "./prism" ]]; then
-        codesign --verify --strict "$dir/prism" && arm64_only "$dir/prism" \
-            && prints_version "$dir/prism" || rc=1
-    else
-        rc=1
-    fi
-    rm -rf "$dir"
-    return "$rc"
-}
-
 exits_with() {      # exits_with <status> <command...>
     local want="$1" got=0; shift
     "$@" || got=$?
@@ -356,8 +337,7 @@ check "codesign --verify --deep --strict" codesign --verify --deep --strict --ve
 check "hardened runtime: app" has_runtime_flag "$ACCEPT_APP"
 check "hardened runtime: prism helper" has_runtime_flag "$HELPERS/prism"
 check "one helper only: Helpers holds just prism" bash -c "[[ \"\$(ls '$HELPERS')\" == prism ]]"
-check "release zip build/Prism-$VERSION.zip" files_exist "$ACCEPT_ROOT/build/Prism-$VERSION.zip"
-check "CLI zip build/prism-$VERSION-macos-arm64.zip holds a signed prism" cli_zip_ok
+check "release zip build/Prism-$VERSION-macos-arm64.zip" files_exist "$ACCEPT_ROOT/build/Prism-$VERSION-macos-arm64.zip"
 
 # --- 8. helper CLIs ---------------------------------------------------------------
 echo "-- 8. helper CLIs"

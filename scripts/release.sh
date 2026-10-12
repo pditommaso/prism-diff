@@ -3,7 +3,7 @@
 # Copyright 2026 Paolo Di Tommaso
 #
 # Builds, checks and publishes a Prism release: a zipped, ad-hoc-signed
-# Prism.app and the standalone prism CLI on GitHub Releases (decision D7: no
+# Prism.app (with the prism command inside) on GitHub Releases (decision D7: no
 # notarization, DMG, cask or updater). The single place for the whole
 # process, run the same way locally and by the CI `release` job.
 #
@@ -27,7 +27,7 @@
 #   d. Bundle: scripts/bundle.sh (ad-hoc signature, hardened runtime), then
 #      codesign --verify --deep --strict, and every version string must equal
 #      VERSION (Info.plist, About via `Prism --version`, `prism --version`).
-#   e. Package into dist/: Prism-<VERSION>.zip, prism-<VERSION>-macos-arm64.zip,
+#   e. Package into dist/: Prism-<VERSION>-macos-arm64.zip,
 #      SHA256SUMS and release-notes.md (the CHANGELOG section, with its
 #      "Unverified on screen" caveats). File mtimes are set to the commit
 #      time (SOURCE_DATE_EPOCH, from `git log -1 --format=%ct`) before zipping.
@@ -206,17 +206,9 @@ zip_dir() { ditto -c -k --norsrc --noextattr --noqtn --noacl "$@"; }
 
 rm -rf "$DIST"
 mkdir -p "$DIST"
-ZIP="Prism-$VERSION.zip"
-CLI_ZIP="prism-$VERSION-macos-arm64.zip"
+ZIP="Prism-$VERSION-macos-arm64.zip"
 set_times "$APP"
 zip_dir --keepParent "$APP" "$DIST/$ZIP"
-cli_stage="build/release-cli"
-rm -rf "$cli_stage"
-mkdir -p "$cli_stage"
-cp -p "$APP/Contents/Helpers/prism" "$cli_stage/prism"
-set_times "$cli_stage"
-zip_dir "$cli_stage" "$DIST/$CLI_ZIP"
-rm -rf "$cli_stage"
 
 check_dir=$(mktemp -d "${TMPDIR:-/tmp}/prism-release.XXXXXX")
 trap 'rm -rf "$check_dir"' EXIT
@@ -224,12 +216,9 @@ ditto -x -k "$DIST/$ZIP" "$check_dir"
 codesign --verify --deep --strict "$check_dir/Prism.app" >&2 || die "the zipped Prism.app does not verify"
 expect_equal "zipped app version" \
     "$(plutil -extract CFBundleShortVersionString raw "$check_dir/Prism.app/Contents/Info.plist")" "$VERSION"
-ditto -x -k "$DIST/$CLI_ZIP" "$check_dir/cli"
-expect_equal "zipped CLI contents" "$(cd "$check_dir/cli" && ls -A)" "prism"
-codesign --verify --strict "$check_dir/cli/prism" >&2 || die "the zipped prism does not verify"
-expect_equal "zipped prism --version" "$("$check_dir/cli/prism" --version)" "$VERSION"
+expect_equal "zipped prism --version" "$("$check_dir/Prism.app/Contents/Helpers/prism" --version)" "$VERSION"
 
-(cd "$DIST" && shasum -a 256 "$ZIP" "$CLI_ZIP" > SHA256SUMS && shasum -a 256 -c SHA256SUMS --quiet)
+(cd "$DIST" && shasum -a 256 "$ZIP" > SHA256SUMS && shasum -a 256 -c SHA256SUMS --quiet)
 
 # The CHANGELOG section: from its heading to the next "## " heading.
 notes=$(awk -v head="## [$VERSION]" '
@@ -254,7 +243,6 @@ grep -qi '^### .*unverified on screen' <<<"$notes" \
 
 - \`$ZIP\`: Prism.app (Apple silicon, macOS 14 or later). Ad-hoc signed
   with the hardened runtime and not notarized.
-- \`$CLI_ZIP\`: the standalone \`prism\` command-line tool.
 - \`SHA256SUMS\`: check the downloads with \`shasum -a 256 -c SHA256SUMS\`.
 
 ### Installing
