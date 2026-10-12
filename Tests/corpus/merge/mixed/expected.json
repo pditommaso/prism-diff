@@ -1,0 +1,17 @@
+{
+  "format": "prism-merge3",
+  "version": 1,
+  "whitespace": 0,
+  "conflicts": 1,
+  "unresolved": 1,
+  "regions": [
+    {"kind": "auto", "choice": "a", "a": [0, 1], "b": [0, 0], "base": [0, 0], "merged": [0, 1]},
+    {"kind": "equal", "choice": "none", "a": [1, 4], "b": [0, 3], "base": [0, 3], "merged": [1, 4]},
+    {"kind": "auto", "choice": "a", "a": [4, 4], "b": [3, 4], "base": [3, 4], "merged": [4, 4]},
+    {"kind": "equal", "choice": "none", "a": [4, 5], "b": [4, 5], "base": [4, 5], "merged": [4, 5]},
+    {"kind": "auto", "choice": "b", "a": [5, 6], "b": [5, 6], "base": [5, 6], "merged": [5, 6]},
+    {"kind": "equal", "choice": "none", "a": [6, 8], "b": [6, 8], "base": [6, 8], "merged": [6, 8]},
+    {"kind": "conflict", "choice": "none", "a": [8, 9], "b": [8, 9], "base": [8, 9], "merged": [8, 9]}
+  ],
+  "merged": "# pantry\napples 4\npears 2\nplums 9\ndates 12\nlimes 5\nkiwis 6\nmelons 2\ntotal 38"
+}

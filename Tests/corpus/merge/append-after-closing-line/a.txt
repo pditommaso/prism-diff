@@ -1,0 +1,4 @@
+// header v2
+func a() {
+    one()
+}

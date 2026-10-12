@@ -1,0 +1,526 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Paolo Di Tommaso
+#
+# Continuous integration for Prism: clean-room and licence guards (with
+# the clean-room audit), strict build and tests, the headless acceptance
+# scripts, the performance suite and the app bundle, on every push and pull
+# request.
+#
+# Releases: a push to master whose head commit message contains "[release]"
+# also runs the `release` job once every check above has passed. It runs
+# scripts/release.sh, which reads the version from VERSION, rebuilds and
+# re-checks everything, tags v<VERSION>, pushes that tag and publishes the
+# GitHub release (a pre-release for versions like 1.1.0-rc1). The
+# "[release]" commit on master is the owner's approval; see CONTRIBUTING.md.
+#
+# Corpus note: the accept-m01 job runs `generate.py` (with an isolated
+# python3 -I) to rebuild the large, git-ignored performance inputs (the 1M
+# line pair is about 51 MB per file), and M01.sh verifies them against
+# Tests/corpus/generated.sha256 before using them. The other jobs need only
+# the committed fixtures, which are checked against fixtures.sha256.
+#
+# Perf budgets: M01.sh multiplies them by PRISM_PERF_SCALE, set to 3 here
+# for the shared macos-26 runners; the 130 ms bound of the big case is
+# absolute.
+name: ci
+
+on:
+  push:
+    branches:
+      - master
+      - 'm*'
+  pull_request:
+
+# Pinned toolchain: Xcode 26.5 on the macos-26 image, for every job.
+env:
+  DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+  # The runners have no usable display: skip the AppKit app tests and the
+  # timing-sensitive ones (they run in full locally; see build-strict.sh).
+  PRISM_CI_SKIP_APP_TESTS: '1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  guards:
+    name: guards
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: SPDX headers
+        run: scripts/ci/check-spdx.sh
+
+      - name: Clean-room rules
+        run: scripts/ci/check-cleanroom.sh
+
+      - name: Clean-room audit (original strings by hash)
+        run: scripts/ci/cleanroom-audit.sh
+
+      - name: Guard self-tests
+        run: |
+          scripts/tests/cleanroom-selftest.sh
+          scripts/tests/cleanroom-audit-selftest.sh
+          scripts/tests/spdx-selftest.sh
+          scripts/tests/semver-selftest.sh
+
+      - name: DCO sign-off
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          zeros=0000000000000000000000000000000000000000
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            range="$PR_BASE..$PR_HEAD"
+          elif [[ -n "$PUSH_BEFORE" && "$PUSH_BEFORE" != "$zeros" ]] \
+              && git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then
+            range="$PUSH_BEFORE..$PUSH_SHA"
+          else
+            # New branch or tag (or a force push that dropped "before"):
+            # check only what is not yet on main, so the unsigned initial
+            # commit is never examined.
+            range="origin/master..HEAD"
+          fi
+          echo "DCO range: $range"
+          scripts/ci/check-dco.sh "$range"
+
+  build-test:
+    name: build-test
+    needs: guards
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          swift --version
+          sw_vers
+          uname -m
+
+      - name: Manifest toolchain flags
+        run: scripts/tests/manifest-selftest.sh
+
+      - name: Strict build and tests
+        run: scripts/ci/build-strict.sh
+
+      - name: Strict build gate self-test
+        run: scripts/tests/build-strict-selftest.sh
+
+      - name: Corpus fixtures checksum
+        working-directory: Tests/corpus
+        run: shasum -a 256 -c fixtures.sha256 --quiet
+
+      - name: Merge cases checksum
+        working-directory: Tests/corpus
+        run: |
+          set -euo pipefail
+          shasum -a 256 -c merge.sha256 --quiet
+          # Every file under merge/ must be listed.
+          diff <(awk '{ print $2 }' merge.sha256 | sort) <(find merge -type f ! -name .DS_Store | sort)
+
+      - name: Repo builder smoke test
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          export HOME="$tmp/home" GIT_CONFIG_GLOBAL=/dev/null
+          mkdir -p "$HOME"
+          Tests/corpus/scripts/make-repo.sh "$tmp/repo"
+          commits="$(git -C "$tmp/repo" rev-list --all --count)"
+          modified="$(git -C "$tmp/repo" status --porcelain | wc -l | tr -d ' ')"
+          echo "commits=$commits modified=$modified"
+          [[ "$commits" == 3 && "$modified" == 2 ]]
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ github.sha }}
+          path: build/logs/
+          if-no-files-found: ignore
+
+  accept-m01:
+    name: accept-m01
+    needs: build-test
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate the large corpus inputs
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I Tests/corpus/scripts/generate.py
+          cd Tests/corpus/generated
+          shasum -a 256 -c ../generated.sha256 --quiet
+
+      - name: M1 acceptance
+        env:
+          CI: 'true'
+          PRISM_PERF_SCALE: '3'
+          # build-strict.sh already ran in the build-test job; M01.sh still
+          # builds prism and PrismBench in release mode.
+          PRISM_ACCEPT_SKIP_BUILD: '1'
+        run: scripts/accept/M01.sh
+
+      - name: Upload acceptance output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accept-M01-${{ github.sha }}
+          path: build/accept/M01/
+          if-no-files-found: ignore
+
+  accept-m02:
+    name: accept-m02
+    needs: build-test
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: M2 acceptance
+        env:
+          CI: 'true'
+          PRISM_PERF_SCALE: '3'
+          # build-strict.sh already ran in the build-test job; M02.sh still
+          # builds prism in release mode.
+          PRISM_ACCEPT_SKIP_BUILD: '1'
+        run: scripts/accept/M02.sh
+
+      - name: Upload acceptance output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accept-M02-${{ github.sha }}
+          path: build/accept/M02/
+          if-no-files-found: ignore
+
+  accept-m03:
+    name: accept-m03
+    needs: build-test
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: M3 acceptance (headless)
+        env:
+          CI: 'true'
+          PRISM_PERF_SCALE: '3'
+          # build-strict.sh already ran in the build-test job; M03.sh still
+          # runs the app unit tests and builds the bundle.
+          PRISM_ACCEPT_SKIP_BUILD: '1'
+        run: scripts/accept/M03.sh
+
+      - name: Upload acceptance output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accept-M03-${{ github.sha }}
+          path: build/accept/M03/
+          if-no-files-found: ignore
+
+  accept-m04:
+    name: accept-m04
+    needs: build-test
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: M4 acceptance (headless)
+        env:
+          CI: 'true'
+          PRISM_PERF_SCALE: '3'
+          # build-strict.sh already ran in the build-test job; M04.sh still
+          # runs the app unit tests, builds the bundle and generates the
+          # large corpus inputs (indent-only and minified pairs).
+          PRISM_ACCEPT_SKIP_BUILD: '1'
+        run: scripts/accept/M04.sh
+
+      - name: Upload acceptance output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accept-M04-${{ github.sha }}
+          path: build/accept/M04/
+          if-no-files-found: ignore
+
+  accept-m06:
+    name: accept-m06
+    needs: build-test
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: M6 acceptance (headless)
+        env:
+          CI: 'true'
+          PRISM_PERF_SCALE: '3'
+          # build-strict.sh already ran in the build-test job; M06.sh still
+          # runs the app unit tests and the release-mode re-diff timing. It
+          # never launches the app in CI.
+          PRISM_ACCEPT_SKIP_BUILD: '1'
+        run: scripts/accept/M06.sh
+
+      - name: Upload acceptance output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accept-M06-${{ github.sha }}
+          path: build/accept/M06/
+          if-no-files-found: ignore
+
+  accept-m07:
+    name: accept-m07
+    needs: build-test
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: M7 acceptance (headless)
+        env:
+          CI: 'true'
+          # build-strict.sh already ran in the build-test job; M07.sh still
+          # builds the debug binaries, runs git mergetool against the stub
+          # server and the merge window's unit tests. It never launches the app.
+          PRISM_ACCEPT_SKIP_BUILD: '1'
+        run: scripts/accept/M07.sh
+
+      - name: Upload acceptance output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accept-M07-${{ github.sha }}
+          path: build/accept/M07/
+          if-no-files-found: ignore
+
+  accept-m08:
+    name: accept-m08
+    needs: build-test
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: M8 acceptance (headless)
+        env:
+          CI: 'true'
+          PRISM_PERF_SCALE: '3'
+          # build-strict.sh already ran in the build-test job; M08.sh still
+          # builds PrismBench and prism in release mode and generates the
+          # 200k-file tree under build/folder-gen.
+          PRISM_ACCEPT_SKIP_BUILD: '1'
+        run: scripts/accept/M08.sh
+
+      - name: Upload acceptance output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accept-M08-${{ github.sha }}
+          path: build/accept/M08/
+          if-no-files-found: ignore
+
+  accept-m05:
+    name: accept-m05
+    needs: build-test
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: M5 acceptance (headless, against the stub server)
+        env:
+          CI: 'true'
+          # build-strict.sh already ran in the build-test job; M05.sh still
+          # builds the debug products it runs (prism, PrismIPCStub).
+          PRISM_ACCEPT_SKIP_BUILD: '1'
+        run: scripts/accept/M05.sh
+
+      - name: Upload acceptance output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accept-M05-${{ github.sha }}
+          path: build/accept/M05/
+          if-no-files-found: ignore
+
+  accept-m09:
+    name: accept-m09
+    needs: build-test
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Acceptance M09 (headless)
+        env:
+          CI: 'true'
+          # build-strict.sh already ran in the build-test job.
+          PRISM_ACCEPT_SKIP_BUILD: '1'
+        run: scripts/accept/M09.sh
+
+      - name: Upload acceptance output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accept-M09-${{ github.sha }}
+          path: build/accept/M09/
+          if-no-files-found: ignore
+
+  accept-m10:
+    name: accept-m10
+    needs: build-test
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Acceptance M10 (headless)
+        env:
+          CI: 'true'
+          # build-strict.sh already ran in the build-test job.
+          PRISM_ACCEPT_SKIP_BUILD: '1'
+        run: scripts/accept/M10.sh
+
+      - name: Upload acceptance output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accept-M10-${{ github.sha }}
+          path: build/accept/M10/
+          if-no-files-found: ignore
+
+  perf:
+    name: perf
+    needs: build-test
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Performance suite (headless)
+        env:
+          # Budgets x 3 on the shared runners; the suite builds the release
+          # products it runs and generates the large corpus inputs and the
+          # 200k-file tree itself.
+          PRISM_PERF_SCALE: '3'
+        run: scripts/perf/run.sh
+
+      - name: Upload perf results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-${{ github.sha }}
+          path: build/perf/
+          if-no-files-found: ignore
+
+  bundle:
+    name: bundle
+    needs: build-test
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build app bundle
+        run: scripts/bundle.sh
+
+      - name: M0 acceptance (headless)
+        env:
+          CI: 'true'
+          # build-strict.sh already ran in the build-test job.
+          PRISM_ACCEPT_SKIP_BUILD: '1'
+        run: scripts/accept/M00.sh
+
+      - name: Upload app and CLI archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: prism-app-${{ github.sha }}
+          path: |
+            build/Prism-*.zip
+            build/prism-*-macos-arm64.zip
+          if-no-files-found: error
+
+      - name: Upload acceptance output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accept-M00-${{ github.sha }}
+          path: build/accept/M00/
+          if-no-files-found: ignore
+
+  # Publishes a release: only for a push to master whose head commit message
+  # contains "[release]", after every check has passed. scripts/release.sh
+  # does the whole job (preflight, clean strict build and tests, guards,
+  # headless acceptance, bundle, verification, dist/, tag and GitHub
+  # release); it is the same script maintainers run locally with --dry-run.
+  release:
+    name: release
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/master'
+      && contains(github.event.head_commit.message, '[release]')
+    needs: [guards, build-test, bundle, accept-m01, accept-m02]
+    runs-on: macos-26
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PRISM_BUILD_NUMBER: ${{ github.run_number }}
+          # Perf budgets x 3 on the shared runners, as in the other jobs.
+          PRISM_PERF_SCALE: '3'
+          # Identity of the annotated tag.
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: scripts/release.sh
+
+      - name: Upload release files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ github.sha }}
+          path: dist/
+          if-no-files-found: ignore

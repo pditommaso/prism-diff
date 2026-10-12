@@ -1,0 +1,13 @@
+{
+  "format": "prism-merge3",
+  "version": 1,
+  "whitespace": 0,
+  "conflicts": 1,
+  "unresolved": 1,
+  "regions": [
+    {"kind": "equal", "choice": "none", "a": [0, 3], "b": [0, 3], "base": [0, 3], "merged": [0, 3]},
+    {"kind": "conflict", "choice": "none", "a": [3, 3], "b": [3, 4], "base": [3, 4], "merged": [3, 3]},
+    {"kind": "equal", "choice": "none", "a": [3, 7], "b": [4, 8], "base": [4, 8], "merged": [3, 7]}
+  ],
+  "merged": "Rota\nMon: Ada\nTue: Brook\nThu: Dana\nFri: Emil\nSat: closed\nSun: closed\n"
+}

@@ -1,0 +1,13 @@
+{
+  "format": "prism-merge3",
+  "version": 1,
+  "whitespace": 0,
+  "conflicts": 1,
+  "unresolved": 1,
+  "regions": [
+    {"kind": "equal", "choice": "none", "a": [0, 1], "b": [0, 1], "base": [0, 1], "merged": [0, 1]},
+    {"kind": "conflict", "choice": "none", "a": [1, 2], "b": [1, 2], "base": [1, 2], "merged": [1, 2]},
+    {"kind": "equal", "choice": "none", "a": [2, 3], "b": [2, 3], "base": [2, 3], "merged": [2, 3]}
+  ],
+  "merged": "line1\nline2 main\nline3\n"
+}

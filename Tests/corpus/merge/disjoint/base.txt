@@ -1,0 +1,20 @@
+step 01: fetch the sources
+step 02: check the signatures
+step 03: unpack the archive
+step 04: read the notes
+step 05: configure the build
+step 06: compile the library
+step 07: compile the tools
+step 08: run the unit tests
+step 09: run the slow tests
+step 10: collect the logs
+step 11: package the binaries
+step 12: write the manifest
+step 13: sign the package
+step 14: upload to staging
+step 15: smoke test staging
+step 16: promote to release
+step 17: tag the commit
+step 18: announce the release
+step 19: close the milestone
+step 20: archive the logs

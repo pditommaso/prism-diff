@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Paolo Di Tommaso
+#
+# Clean-room audit hash list, read by scripts/ci/cleanroom-audit.sh.
+# One SHA-256 per line of a normalised string (see the script header), and
+# the length in words of the longest one ("max-words").
+#
+# How the list was built (2026-10-12, M11): the private research notes
+# (the menu dumps and the observation notes of the original app, kept
+# outside this repository) were read, and every quoted UI string and menu
+# title was extracted. From those, the distinctive ones were kept:
+#   - sentences and captions of dialogs, settings, bars and empty states;
+#   - descriptive preference labels and status texts;
+#   - internal identifiers (class names).
+# Left out on purpose:
+#   - standard macOS menu items and system services (Undo, Minimize, ...);
+#   - command, menu and mode names that the behavioural spec requires for
+#     compatibility (the user-visible command vocabulary, like the View and
+#     Merge menu items, and labels such as conflict and change counters);
+#   - file names and paths from the test sessions, and the other product's
+#     name, which check-cleanroom.sh already rejects.
+# The plaintext was hashed with `scripts/ci/cleanroom-audit.sh --hash` and
+# is not kept in the repository. The strings that matched when the audit
+# was introduced were reworded in our own words, and the audit then
+# reported 0 matches.
+0f99e3a80dd1a8d1061cde552e471f8a6826475c9eb8640f5b1aad4ac18c5a02
+1eaa09eb5503cde895a00c24f6531052af16cb4cfc2f0f038647d8fc2ec41951
+27d320f2e49a55528b0e40fc76d126820d1f7ee18b28adc53cfe1b6c9b130a48
+3d318c2f57f57b1d9e9e87b793a837fe9c2bc29978c370af1a8b1a1036f5064f
+626f6cdbf06a9497681efc5c37bf1bf6543ecd5100d9a453d9fdd87d77c89e20
+66b9ed8e48f5bbeca2263bd93fea0c44d374dc10994bb5bae88a47fc9ab8b4cf
+79345cc9ce288fe788c2480155f13726f9e281e30981990c963ccafbdb6145c4
+7b7c53c6ba134c87389baa30a853aab4b66495652a84d35e4c8619d22aa55663
+7bfe77fe40b4d9b77c069825aad089f6f1ca2141dc20dfbd45f39024219113b1
+aa886a49e9aaaf5479f09dfabb19e6af79e4b40e1c994cd3f75b222530fc4dd8
+bef3a2d3ecc81d30b8d991c7a9091235774a668f5a8fb2b8d2e7630f5d07f83f
+d3a67f15fd3ba3cdb3c267f2b8d3c70ad29e313a842aa18084afd866a2368d15
+d5af25391034b525d0642dfbdb17e0fd75c4ae55beb466cdf959bdfb37aafaa2
+e032e9e2e079dd90ae6577d224abaeccbb98abb40bf61b1026aa1552a539f781
+e6dec46a8c477d2a336ce814fd810ba41637e99023203a27d5db30302f197d76
+ea8638afcdf377cebb938b8f2243153d43f6d3f07e87cd7d2b08ee01ec148dd5
+max-words 11

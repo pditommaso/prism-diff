@@ -1,0 +1,15 @@
+{
+  "format": "prism-merge3",
+  "version": 1,
+  "whitespace": 0,
+  "conflicts": 0,
+  "unresolved": 0,
+  "regions": [
+    {"kind": "equal", "choice": "none", "a": [0, 2], "b": [0, 2], "base": [0, 2], "merged": [0, 2]},
+    {"kind": "auto", "choice": "a", "a": [2, 3], "b": [2, 3], "base": [2, 3], "merged": [2, 3]},
+    {"kind": "equal", "choice": "none", "a": [3, 16], "b": [3, 16], "base": [3, 16], "merged": [3, 16]},
+    {"kind": "auto", "choice": "b", "a": [16, 17], "b": [16, 17], "base": [16, 17], "merged": [16, 17]},
+    {"kind": "equal", "choice": "none", "a": [17, 20], "b": [17, 20], "base": [17, 20], "merged": [17, 20]}
+  ],
+  "merged": "step 01: fetch the sources\nstep 02: check the signatures\nstep 03: unpack the archive into a clean directory\nstep 04: read the notes\nstep 05: configure the build\nstep 06: compile the library\nstep 07: compile the tools\nstep 08: run the unit tests\nstep 09: run the slow tests\nstep 10: collect the logs\nstep 11: package the binaries\nstep 12: write the manifest\nstep 13: sign the package\nstep 14: upload to staging\nstep 15: smoke test staging\nstep 16: promote to release\nstep 17: tag the commit and push the tag\nstep 18: announce the release\nstep 19: close the milestone\nstep 20: archive the logs\n"
+}

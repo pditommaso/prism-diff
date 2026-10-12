@@ -1,0 +1,23 @@
+ 1 import Foundation                                                              1 import Foundation
+                                                                               >  2 import OSLog
+ 2                                                                                3
+ 3 /// Computes greeting for a user.                                           |  4 /// Computes a friendly greeting for a user.
+ 4 struct Greeter {                                                               5 struct Greeter {
+ 5     let name: String                                                           6     let name: String
+ 6     var excited: Bool = false                                               |  7     var excited: Bool = true
+                                                                               >  8     var language: String = "en"
+ 7                                                                                9
+ 8     func greet() -> String {                                                  10     func greet() -> String {
+ 9         let base = "Hello, \(name)"                                         | 11         let base = language == "it" ? "Ciao, \(name)" : "Hello, \(name)"
+10         return excited ? base + "!" : base + "."                              12         return excited ? base + "!" : base + "."
+11     }                                                                         13     }
+12                                                                               14
+13     func farewell() -> String {                                               15     func farewell() -> String {
+14         return "Goodbye, \(name)."                                          | 16             return "Goodbye, \(name)."
+15     }                                                                         17     }
+16 }                                                                             18 }
+17                                                                               19
+18 let g = Greeter(name: "World")                                              | 20 let g = Greeter(name: "Prism")
+19 print(g.greet())                                                              21 print(g.greet())
+20 print(g.farewell())                                                         <
+21 // trailing comment                                                         <

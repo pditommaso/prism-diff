@@ -1,0 +1,10 @@
+Prism Diff
+Copyright 2026 Paolo Di Tommaso
+
+This product is developed under the Apache License, Version 2.0 (see LICENSE).
+
+Prism is an independent open-source project. It is not affiliated with,
+sponsored by, or endorsed by the makers of any other file comparison tool.
+
+The prism command accepts the same options as ksdiff, the command-line tool
+of another product. That name appears only to describe compatibility.

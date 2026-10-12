@@ -1,0 +1,11 @@
+{
+  "format": "prism-merge3",
+  "version": 1,
+  "whitespace": 0,
+  "conflicts": 0,
+  "unresolved": 0,
+  "regions": [
+    {"kind": "equal", "choice": "none", "a": [0, 8], "b": [0, 8], "base": [0, 8], "merged": [0, 8]}
+  ],
+  "merged": "[server]\nhost = 127.0.0.1\nport = 8080\nworkers = 8\n\n[log]\nlevel = debug\nfile = server.log\n"
+}

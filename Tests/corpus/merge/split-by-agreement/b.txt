@@ -1,0 +1,6 @@
+recipe: tomato soup
+serves 2
+onions 2
+tomatoes 8
+simmer 20 min
+salt to taste

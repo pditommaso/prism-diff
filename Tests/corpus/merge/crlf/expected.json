@@ -1,0 +1,15 @@
+{
+  "format": "prism-merge3",
+  "version": 1,
+  "whitespace": 1,
+  "conflicts": 0,
+  "unresolved": 0,
+  "regions": [
+    {"kind": "equal", "choice": "none", "a": [0, 1], "b": [0, 1], "base": [0, 1], "merged": [0, 1]},
+    {"kind": "auto", "choice": "a", "a": [1, 2], "b": [1, 2], "base": [1, 2], "merged": [1, 2]},
+    {"kind": "equal", "choice": "none", "a": [2, 7], "b": [2, 7], "base": [2, 7], "merged": [2, 7]},
+    {"kind": "auto", "choice": "b", "a": [7, 8], "b": [7, 8], "base": [7, 8], "merged": [7, 8]},
+    {"kind": "equal", "choice": "none", "a": [8, 9], "b": [8, 9], "base": [8, 9], "merged": [8, 9]}
+  ],
+  "merged": "The kettle sings at half past six,\r\nthe dog demands his share,\r\nthe radio mumbles weather news\r\nto an empty kitchen chair.\r\n\r\nThe bus is late, the rain is not,\r\nthe umbrella will not close,\r\nand somewhere in a pocket lost\na ticket and a rose.\r\n"
+}

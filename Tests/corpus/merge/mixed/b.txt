@@ -1,0 +1,9 @@
+apples 4
+pears 2
+plums 9
+figs 1
+dates 12
+limes 5
+kiwis 6
+melons 2
+total 41

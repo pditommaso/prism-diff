@@ -1,0 +1,9 @@
+# pantry
+apples 4
+pears 2
+plums 9
+dates 12
+limes 3
+kiwis 6
+melons 2
+total 38

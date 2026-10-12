@@ -1,0 +1,13 @@
+{
+  "format": "prism-merge3",
+  "version": 1,
+  "whitespace": 0,
+  "conflicts": 0,
+  "unresolved": 0,
+  "regions": [
+    {"kind": "equal", "choice": "none", "a": [0, 4], "b": [0, 4], "base": [0, 4], "merged": [0, 4]},
+    {"kind": "auto", "choice": "a", "a": [4, 5], "b": [4, 5], "base": [4, 5], "merged": [4, 5]},
+    {"kind": "equal", "choice": "none", "a": [5, 10], "b": [5, 10], "base": [5, 10], "merged": [5, 10]}
+  ],
+  "merged": "Spring planting plan\n\nBed 1: tomatoes, basil\nBed 2: carrots, radishes\nBed 3: lettuce, rocket, spinach\nBed 4: beans along the fence\nBed 5: squash in the corner\n\nWater every second morning.\nMulch after the last frost.\n"
+}

@@ -1,0 +1,5 @@
+{"format":"prism-diff","version":1,"whitespace":0,"changes":1,"blocks":[
+{"kind":"equal","a":[0,10],"b":[0,10]},
+{"kind":"insert","a":[10,10],"b":[10,17]},
+{"kind":"equal","a":[10,17],"b":[17,24]}
+]}

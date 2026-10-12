@@ -1,0 +1,22 @@
+# file	kind	encoding-or-format	bom	line-endings
+utf8.txt	text	utf-8	no	lf
+utf8-bom.txt	text	utf-8	yes	lf
+utf16le-bom.txt	text	utf-16le	yes	lf
+utf16be-bom.txt	text	utf-16be	yes	lf
+utf16le.txt	text	utf-16le	no	lf
+latin1.txt	text	iso-8859-1	no	lf
+windows1252.txt	text	windows-1252	no	lf
+shift-jis.txt	text	shift_jis	no	crlf
+crlf.txt	text	utf-8	no	crlf
+mixed-crlf.txt	text	utf-8	no	mixed
+no-final-newline.txt	text	utf-8	no	lf
+empty.txt	text	utf-8	no	none
+image-png.bin	binary	-	-	-
+archive.zip	binary	-	-	-
+macho.bin	binary	-	-	-
+random.bin	binary	-	-	-
+doc.rtf	document	rtf	-	lf
+doc.pdf	document	pdf	-	lf
+doc.docx	document	docx	-	lf
+doc.odt	document	odt	-	lf
+doc.doc	document	doc	-	lf

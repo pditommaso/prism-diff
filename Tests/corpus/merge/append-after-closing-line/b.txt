@@ -1,0 +1,8 @@
+// header
+func a() {
+    one()
+}
+
+func b() {
+    two()
+}

@@ -1,0 +1,6 @@
+# Synthetic diff inputs and expected outputs must stay byte-identical: no line-ending conversion,
+# no whitespace checks.
+Tests/corpus/fixtures/** -text whitespace=-trailing-space,-space-before-tab,-indent-with-non-tab,-tab-in-indent,-cr-at-eol
+Tests/corpus/merge/** -text whitespace=-trailing-space,-space-before-tab,-indent-with-non-tab,-tab-in-indent,-cr-at-eol
+Tests/corpus/golden/** -text whitespace=-trailing-space,-space-before-tab,-indent-with-non-tab,-tab-in-indent,-cr-at-eol
+Tests/corpus/encodings/** -text whitespace=-trailing-space,-space-before-tab,-indent-with-non-tab,-tab-in-indent,-cr-at-eol

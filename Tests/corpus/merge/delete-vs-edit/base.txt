@@ -1,0 +1,8 @@
+Rota
+Mon: Ada
+Tue: Brook
+Wed: Cyril
+Thu: Dana
+Fri: Emil
+Sat: closed
+Sun: closed

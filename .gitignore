@@ -1,0 +1,17 @@
+# SwiftPM / build output
+.build/
+build/
+.swiftpm/
+*.xcodeproj
+
+# macOS
+.DS_Store
+
+# Generated test corpus (rebuilt by Tests/corpus/scripts/generate.py)
+Tests/corpus/generated/
+
+# Release output (scripts/release.sh)
+dist/
+
+# IDE
+.idea/

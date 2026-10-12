@@ -1,0 +1,13 @@
+{
+  "format": "prism-merge3",
+  "version": 1,
+  "whitespace": 0,
+  "conflicts": 1,
+  "unresolved": 1,
+  "regions": [
+    {"kind": "equal", "choice": "none", "a": [0, 2], "b": [0, 2], "base": [0, 2], "merged": [0, 2]},
+    {"kind": "conflict", "choice": "none", "a": [2, 3], "b": [2, 3], "base": [2, 3], "merged": [2, 3]},
+    {"kind": "equal", "choice": "none", "a": [3, 8], "b": [3, 8], "base": [3, 8], "merged": [3, 8]}
+  ],
+  "merged": "[server]\nhost = 127.0.0.1\nport = 9090\nworkers = 2\n\n[log]\nlevel = info\nfile = server.log\n"
+}

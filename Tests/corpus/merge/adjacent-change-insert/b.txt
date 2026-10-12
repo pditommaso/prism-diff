@@ -1,0 +1,5 @@
+title: night walk
+length_km = 4
+bring a torch
+pace = easy
+end

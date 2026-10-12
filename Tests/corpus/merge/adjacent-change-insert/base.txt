@@ -1,0 +1,4 @@
+title: night walk
+length_km = 4
+pace = easy
+end

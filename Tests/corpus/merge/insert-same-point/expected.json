@@ -1,0 +1,13 @@
+{
+  "format": "prism-merge3",
+  "version": 1,
+  "whitespace": 0,
+  "conflicts": 1,
+  "unresolved": 1,
+  "regions": [
+    {"kind": "equal", "choice": "none", "a": [0, 4], "b": [0, 4], "base": [0, 4], "merged": [0, 4]},
+    {"kind": "conflict", "choice": "none", "a": [4, 5], "b": [4, 6], "base": [4, 4], "merged": [4, 5]},
+    {"kind": "equal", "choice": "none", "a": [5, 8], "b": [6, 9], "base": [4, 7], "merged": [5, 8]}
+  ],
+  "merged": "Saturday\n- buy bread\n- repair the bike\n- call the plumber\n- return the library books\nSunday\n- long walk\n- read\n"
+}
