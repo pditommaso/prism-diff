@@ -119,6 +119,12 @@ final class BlocksDiffView: NSView {
     let scrollA = NSScrollView()
     let scrollB = NSScrollView()
     let divider: DividerView
+    /// Drags the divider between the panes.
+    let splitHandle = SplitHandleView()
+    /// A's share of the width the two panes take (Blocks and Fluid).
+    private(set) var splitFraction: CGFloat = 0.5
+    /// Called after the divider moves.
+    var onSplitChange: (() -> Void)?
     let overviewA = OverviewScroller()
     let overviewB = OverviewScroller()
     private var syncing = false
@@ -136,6 +142,8 @@ final class BlocksDiffView: NSView {
     /// Blocks: width of the divider; Fluid: width of the connector gutter.
     static let blocksDividerWidth: CGFloat = 2
     static let fluidGutterWidth: CGFloat = 70
+    /// The narrowest a pane gets when the divider is dragged.
+    static let minimumPaneWidth: CGFloat = 80
     /// Widest document, in points. A longer line is reachable with Wrap
     /// Lines; without it the view stops there (huge views and layers lose
     /// precision and memory).
@@ -175,6 +183,9 @@ final class BlocksDiffView: NSView {
         addSubview(gutterA)
         addSubview(divider)
         addSubview(gutterB)
+        addSubview(splitHandle)
+        splitHandle.onDrag = { [weak self] x in self?.dragSplit(to: x) }
+        splitHandle.onReset = { [weak self] in self?.setSplitFraction(0.5) }
         applyModeVisibility()
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
@@ -351,6 +362,7 @@ final class BlocksDiffView: NSView {
         scrollB.isHidden = !twoPanes
         gutterB.isHidden = !twoPanes
         divider.isHidden = !twoPanes
+        splitHandle.isHidden = !twoPanes
         // One vertical scroller, at the right edge of the window: B's in
         // the two-pane layouts (A follows it), A's in Unified.
         scrollA.hasVerticalScroller = !twoPanes
@@ -532,12 +544,15 @@ final class BlocksDiffView: NSView {
         let width = bounds.width, height = bounds.height
         switch mode {
         case .blocks, .fluid:
-            let middle = mode == .blocks ? Self.blocksDividerWidth : Self.fluidGutterWidth
-            let paneWidth = floor((width - middle) / 2)
+            let middle = middleWidth
+            let paneWidth = paneWidthA(forWidth: width)
             let gutter = min(gutterWidth, max(paneWidth - 20, 0))
             gutterA.frame = NSRect(x: 0, y: 0, width: gutter, height: height)
             scrollA.frame = NSRect(x: gutter, y: 0, width: max(paneWidth - gutter, 0), height: height)
             divider.frame = NSRect(x: paneWidth, y: 0, width: middle, height: height)
+            // A thin divider gets a wider grip; the Fluid gutter is all grip.
+            let grip = max(middle, 8)
+            splitHandle.frame = NSRect(x: paneWidth + floor((middle - grip) / 2), y: 0, width: grip, height: height)
             gutterB.frame = NSRect(x: paneWidth + middle, y: 0, width: gutter, height: height)
             scrollB.frame = NSRect(x: paneWidth + middle + gutter, y: 0,
                                    width: max(width - paneWidth - middle - gutter, 0), height: height)
@@ -561,6 +576,36 @@ final class BlocksDiffView: NSView {
             }
         }
         sizeDocuments()
+    }
+
+    private var middleWidth: CGFloat { mode == .blocks ? Self.blocksDividerWidth : Self.fluidGutterWidth }
+
+    /// Width of the A pane, gutter included, when the view is `width` wide.
+    private func paneWidthA(forWidth width: CGFloat) -> CGFloat {
+        let available = max(width - middleWidth, 0)
+        let minimum = min(Self.minimumPaneWidth, floor(available / 2))
+        return min(max(floor(available * splitFraction), minimum), available - minimum)
+    }
+
+    /// x of the middle of the divider when the view is `width` wide.
+    func splitX(forWidth width: CGFloat) -> CGFloat {
+        guard mode != .unified else { return floor((width - 1) / 2) }
+        return paneWidthA(forWidth: width) + floor(middleWidth / 2)
+    }
+
+    func setSplitFraction(_ fraction: CGFloat) {
+        let clamped = min(max(fraction, 0), 1)
+        guard clamped != splitFraction else { return }
+        splitFraction = clamped
+        needsLayout = true
+        onSplitChange?()
+    }
+
+    /// Moves the divider's middle to `x`.
+    private func dragSplit(to x: CGFloat) {
+        let available = bounds.width - middleWidth
+        guard available > 0 else { return }
+        setSplitFraction((x - middleWidth / 2) / available)
     }
 
     func redrawAll() {

@@ -48,6 +48,9 @@ public struct FolderStatistics: Sendable, Equatable {
     public var directories = 0
     /// Directories that could not be listed during the last deep pass.
     public var unreadableDirectories = 0
+    /// Level rows built (and sorted) from listings. Content-check verdicts
+    /// reuse a level's rows instead of building them again.
+    public var rowBuilds = 0
     /// The listing interface used for each side ("bulk" or "fts").
     public var methods: [String] = []
 
@@ -84,12 +87,14 @@ public final class FolderSession: @unchecked Sendable {
 
     private let queue = DispatchQueue(label: "io.github.pditommaso.prism.folder-session", qos: .userInitiated)
     /// Content checks: at most 8 at a time, queued rather than parked on
-    /// threads.
+    /// threads. They resolve rows the user is looking at, so they run at
+    /// the session's QoS: at utility, GCD gave them no thread at all while
+    /// higher-QoS work (another scan, a diff) kept the CPUs busy.
     private let checkQueue: OperationQueue = {
         let queue = OperationQueue()
         queue.name = "io.github.pditommaso.prism.folder-content"
         queue.maxConcurrentOperationCount = 8
-        queue.qualityOfService = .utility
+        queue.qualityOfService = .userInitiated
         return queue
     }()
     private let readers: [any DirectoryReader]
@@ -107,6 +112,9 @@ public final class FolderSession: @unchecked Sendable {
     /// Content-check verdicts by "relative path" + both keys.
     private var contentVerdicts: [ContentKey: Bool] = [:]
     private var contentInFlight: Set<ContentKey> = []
+    /// Levels with a compute queued for new verdicts: the verdicts that
+    /// arrive meanwhile share it.
+    private var verdictComputes: Set<String> = []
     /// Identifies the latest deep pass; results of an older one are dropped.
     private var scanGeneration = 0
     /// FSEvents position when a level was first listed: the stream starts
@@ -252,7 +260,11 @@ public final class FolderSession: @unchecked Sendable {
 
     private final class LevelState {
         let path: String
-        var listings = [LevelLister.Listing(), LevelLister.Listing()]
+        var listings = [LevelLister.Listing(), LevelLister.Listing()] { didSet { baseRows = nil } }
+        /// The rows built from the listings, sorted, before content-check
+        /// verdicts: sorting is the costly part of a compute, and verdicts
+        /// arrive one by one.
+        var baseRows: [FolderRow]?
         /// The tree node each side's listing was made against, to notice a
         /// folder that was deleted and created again.
         var nodes: [ObjectIdentifier?] = [nil, nil]
@@ -291,7 +303,15 @@ public final class FolderSession: @unchecked Sendable {
     /// changed.
     @discardableResult
     private func compute(_ level: LevelState, deliver: Bool = true) -> FolderLevel {
-        var rows = FolderRows.build(left: level.listings[0].entries, right: level.listings[1].entries)
+        let base: [FolderRow]
+        if let rows = level.baseRows {
+            base = rows
+        } else {
+            base = FolderRows.build(left: level.listings[0].entries, right: level.listings[1].entries)
+            level.baseRows = base
+            statistics.rowBuilds += 1
+        }
+        var rows = base
         var checking = false
         if options.compareContents && state == .ready {
             for index in rows.indices where rows[index].status == .changed && !rows[index].isPending {
@@ -624,7 +644,11 @@ public final class FolderSession: @unchecked Sendable {
             queue.async { [self] in
                 contentInFlight.remove(key)
                 contentVerdicts[key] = same
-                if let level = levels[path] { compute(level) }
+                guard verdictComputes.insert(path).inserted else { return }
+                queue.async { [self] in
+                    verdictComputes.remove(path)
+                    if let level = levels[path] { compute(level) }
+                }
             }
         }
     }

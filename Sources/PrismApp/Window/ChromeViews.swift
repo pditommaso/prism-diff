@@ -3,6 +3,40 @@
 
 import AppKit
 
+/// An invisible strip that moves a divider: the left-right resize cursor
+/// over it, a drag reports the pointer's x in the superview, and a double
+/// click asks for the default position.
+@MainActor
+final class SplitHandleView: NSView {
+    var onDrag: ((CGFloat) -> Void)?
+    var onReset: (() -> Void)?
+
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: .resizeLeftRight)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        for area in trackingAreas { removeTrackingArea(area) }
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.cursorUpdate, .activeInKeyWindow, .inVisibleRect],
+                                       owner: self))
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        NSCursor.resizeLeftRight.set()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if event.clickCount == 2 { onReset?() }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let superview else { return }
+        NSCursor.resizeLeftRight.set()
+        onDrag?(superview.convert(event.locationInWindow, from: nil).x)
+    }
+}
+
 /// A bar with a flat background and a 1 pt hairline on one edge.
 @MainActor
 class BarView: NSView {

@@ -153,6 +153,46 @@ import Testing
         // 8 checks plus the parallel ranges of large files stay far below
         // one thread per pair.
         #expect(peak - baseline < 40, "threads: baseline \(baseline), peak \(peak)")
+        // Verdicts reuse the level's sorted rows: building them for each of
+        // the 200 verdicts made the checks quadratic in the folder's size.
+        let builds = session.currentStatistics.rowBuilds
+        #expect(builds <= 4, "rows built \(builds) times")
+    }
+
+    // 3b. Content checks keep running while other work keeps GCD busy: at
+    // utility QoS they got no thread at all until the load stopped.
+    @Test func contentChecksRunWhileGCDIsBusy() throws {
+        let (dir, left, right) = try pair("prism-busy")
+        defer { dir.remove() }
+        for index in 0..<20 {
+            try left.file("f\(index).txt", "same \(index)")
+            try right.file("f\(index).txt", "same \(index)", mtime: TreeBuilder.baseTime + 10)
+        }
+        let session = FolderSession(left: left.path, right: right.path, options: FolderOptions(compareContents: true))
+        defer { session.stop() }
+        session.start(watch: false)
+        session.waitUntilScanned()
+
+        // CPU-bound blocks at userInitiated, resubmitted until the checks end.
+        let busy = Flag()
+        busy.value = true
+        defer { busy.value = false }
+        @Sendable func spin() {
+            DispatchQueue.global(qos: .userInitiated).async {
+                var x = 0.0
+                for i in 0..<200_000 { x += (Double(i) + x * 1e-9).squareRoot() }
+                if x < 0 { print(x) }
+                if busy.value { spin() }
+            }
+        }
+        for _ in 0..<(ProcessInfo.processInfo.activeProcessorCount * 4) { spin() }
+
+        let recorder = LevelRecorder()
+        let observation = session.observe("", on: recorder.queue) { recorder.record($0) }
+        defer { observation.cancel() }
+        let level = recorder.wait(timeout: 20) { $0.isComplete }
+        busy.value = false
+        #expect(level?.counts == FolderCounts(changed: 0, unchanged: 20, unmatched: 0))
     }
 
     @Test func cancelledContentChecksStop() throws {

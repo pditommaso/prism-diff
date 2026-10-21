@@ -9,6 +9,50 @@ CONTRIBUTING.md, "Releasing"); the milestone builds before 1.0.0 were tagged
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-21
+
+### Added
+
+- The changeset sidebar is resizable: drag its right edge, double-click
+  it to return to the default width.
+- The divider between the A and B panes can be dragged in the Blocks and
+  Fluid layouts (the whole Fluid gutter is the grip); the path bar
+  follows it, each pane keeps a minimum width, and a double-click splits
+  the panes evenly again.
+- New windows open with the sidebar width and pane split last dragged.
+- Folder groups in the changeset sidebar collapse and expand with a
+  click, shown by a chevron and a folder icon. The file being compared
+  stays open while its folder is collapsed, and Next File / Previous File
+  open collapsed folders as they reach them.
+
+### Fixed
+
+- Folder comparison with "compare contents": files whose dates differ
+  could stay marked as pending while the Mac was busy with other work
+  (another folder scan, for example), because their checks got no
+  processor time until the load stopped. They now run alongside it.
+- Folder comparison with "compare contents": each checked file no
+  longer re-sorts its whole folder. With thousands of touched files (a
+  fresh checkout, for example) the checks used to take minutes of CPU;
+  they now finish in about the time it takes to read the files.
+
+### Unverified on screen
+
+- The 50 ms cancellation bound for a 300k-line diff (unit test) is now
+  checked on a developer Mac only, like the other timing-sensitive tests:
+  the shared 3-CPU CI runners miss it under load (118 ms).
+- The deep pass of the 200k-file folder tree gets a 16 s budget on CI
+  (scale 8), up from 6 s: the current macos-26 runner image takes 8.6 to
+  13.3 s for it with this release and with 1.0.0 alike. On a developer
+  Mac it stays under 1 s, within the 2 s budget.
+- On CI, the M1 acceptance run checks that every diff stops when
+  cancelled, but no longer the 50 ms bound; that bound is checked on a
+  developer Mac.
+- Resizing and collapsing were checked by hand on a developer build;
+  VoiceOver on the new folder rows and on the resize handles was not.
+- The release candidate itself: Prism.app from the zip is verified
+  (signature, versions) but not launched.
+
 ## [1.0.0] - 2026-10-12
 
 <!-- scripts/release.sh turns this section into the release notes. The

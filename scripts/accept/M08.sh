@@ -12,6 +12,9 @@
 #   PRISM_ACCEPT_SKIP_BUILD=1   skip scripts/ci/build-strict.sh (the release
 #                               builds of PrismBench and prism still run)
 #   PRISM_PERF_SCALE=<factor>   multiplies the time budgets (default 1)
+#   PRISM_PERF_FOLDER_SCAN_SCALE=<factor>
+#                               multiplies the deep-pass budget of the 200k
+#                               tree instead (default PRISM_PERF_SCALE)
 #   PRISM_FOLDER_GEN=<dir>      where the 200k-file tree is generated and
 #                               cached (default build/folder-gen)
 #
@@ -42,7 +45,8 @@ cd "$ACCEPT_ROOT" || exit 1
 accept_init M08
 
 SCALE="${PRISM_PERF_SCALE:-1}"
-readonly SCALE
+SCAN_SCALE="${PRISM_PERF_FOLDER_SCAN_SCALE:-$SCALE}"
+readonly SCALE SCAN_SCALE
 GEN="${PRISM_FOLDER_GEN:-$ACCEPT_ROOT/build/folder-gen}"
 readonly GEN
 
@@ -197,7 +201,8 @@ check "src/main.swift pair has 8 text changes" text_changes "$FIX/left/src/main.
 echo "-- 3. generated tree (scale $SCALE)"
 check "generate (or reuse) 200k files in 20k folders under ${GEN#"$ACCEPT_ROOT/"}" "$BENCH" foldergen "$GEN"
 check "first rows <= 50 ms, deep pass <= 2 s warm, RSS <= 150 MB, root counts 14/6/1" \
-    "$BENCH" folderperf --scale "$SCALE" --expect 14,6,1 "$GEN/left" "$GEN/right"
+    "$BENCH" folderperf --first-rows-ms "$(perl -e "print 50 * $SCALE")" --deep-ms "$(perl -e "print 2000 * $SCAN_SCALE")" \
+        --expect 14,6,1 "$GEN/left" "$GEN/right"
 check "fts fallback finds the same root counts" \
     "$BENCH" folderperf --method fts --runs 1 --deep-ms 10000 --scale "$SCALE" --expect 14,6,1 "$GEN/left" "$GEN/right"
 

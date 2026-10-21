@@ -95,6 +95,7 @@ class ComparisonWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         blocksView = BlocksDiffView(font: settings.font, theme: settings.theme)
         blocksView.setMode(settings.viewMode)
         blocksView.setWrapsLines(settings.wrapLines)
+        blocksView.setSplitFraction(settings.splitFraction)
         find = FindController(view: blocksView)
         session = EditSession(a: a, b: b)
         shelf = ShelfModel(files: [ShelfEntry(url: a), ShelfEntry(url: b)])
@@ -132,10 +133,17 @@ class ComparisonWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         content.bottomBar = bottomBar
         content.body = placeholder
         content.onDrop = { [weak self] urls, point in self?.accept(urls, at: point) ?? false }
+        content.sidebarWidth = settings.sidebarWidth
+        content.onSidebarResize = { width in TextSettings().sidebarWidth = width }
         window.contentView = content
 
         blocksView.onSelectionChange = { [weak self] index in self?.selectionChanged(index) }
         blocksView.onFirstPaint = { [weak self] in self?.firstPaint() }
+        blocksView.onSplitChange = { [weak self] in
+            guard let self else { return }
+            self.content.needsLayout = true
+            TextSettings().splitFraction = self.blocksView.splitFraction
+        }
         NotificationCenter.default.addObserver(self, selector: #selector(settingsChanged(_:)),
                                                name: TextSettings.didChange, object: nil)
         updateChrome()
@@ -634,11 +642,19 @@ final class ComparisonContentView: NSView {
     static let bottomBarHeight: CGFloat = 37
 
     static let sidebarWidth: CGFloat = 260
+    static let minimumSidebarWidth: CGFloat = 140
+    /// The width the sidebar leaves at least to the comparison.
+    static let minimumBodyWidth: CGFloat = 320
 
     var tabStrip: NSView? { didSet { replace(oldValue, with: tabStrip) } }
     /// Docked on the left below the tab strip; the path bar, the comparison
-    /// and the bottom bar take the rest of the width.
+    /// and the bottom bar take the rest of the width. Its right edge drags.
     var sidebar: NSView? { didSet { replace(oldValue, with: sidebar) } }
+    /// The width asked for the sidebar; a narrow window gives it less.
+    var sidebarWidth: CGFloat = ComparisonContentView.sidebarWidth { didSet { needsLayout = true } }
+    /// Called with the new width after the user drags (or resets) the sidebar.
+    var onSidebarResize: ((CGFloat) -> Void)?
+    let sidebarHandle = SplitHandleView()
     var pathBar: NSView? { didSet { replace(oldValue, with: pathBar) } }
     /// The file shelf, below the path bar, when shown.
     var shelf: NSView? {
@@ -666,6 +682,16 @@ final class ComparisonContentView: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         registerForDraggedTypes([.fileURL])
+        sidebarHandle.onDrag = { [weak self] x in
+            guard let self else { return }
+            self.sidebarWidth = min(max(Self.minimumSidebarWidth, round(x)),
+                                    max(self.bounds.width - Self.minimumBodyWidth, Self.minimumSidebarWidth))
+            self.onSidebarResize?(self.sidebarWidth)
+        }
+        sidebarHandle.onReset = { [weak self] in
+            self?.sidebarWidth = Self.sidebarWidth
+            self?.onSidebarResize?(Self.sidebarWidth)
+        }
     }
 
     @available(*, unavailable)
@@ -676,6 +702,8 @@ final class ComparisonContentView: NSView {
     private func replace(_ old: NSView?, with new: NSView?) {
         old?.removeFromSuperview()
         if let new { addSubview(new) }
+        // The handle stays above the views it straddles.
+        if sidebar != nil { addSubview(sidebarHandle) } else { sidebarHandle.removeFromSuperview() }
         needsLayout = true
     }
 
@@ -686,8 +714,9 @@ final class ComparisonContentView: NSView {
             tabStrip.frame = NSRect(x: 0, y: y, width: bounds.width, height: Self.tabStripHeight)
             y += Self.tabStripHeight
         }
-        let x: CGFloat = sidebar == nil ? 0 : min(Self.sidebarWidth, floor(bounds.width / 3))
+        let x: CGFloat = sidebar == nil ? 0 : laidOutSidebarWidth
         sidebar?.frame = NSRect(x: 0, y: y, width: x, height: max(bounds.height - y, 0))
+        sidebarHandle.frame = NSRect(x: x - 3, y: y, width: 6, height: max(bounds.height - y, 0))
         let width = bounds.width - x
         pathBar?.frame = NSRect(x: x, y: y, width: width, height: Self.pathBarHeight)
         y += Self.pathBarHeight
@@ -703,7 +732,13 @@ final class ComparisonContentView: NSView {
         body?.frame = NSRect(x: x, y: y, width: width, height: max(bottom - y, 0))
         bottomBar?.frame = NSRect(x: x, y: bottom, width: width, height: Self.bottomBarHeight)
         // The swap button sits over the divider between the panes.
-        (pathBar as? PathBarView)?.splitX = floor((width - 1) / 2)
+        (pathBar as? PathBarView)?.splitX = (body as? BlocksDiffView)?.splitX(forWidth: width) ?? floor((width - 1) / 2)
+    }
+
+    /// The sidebar's width in the current bounds.
+    var laidOutSidebarWidth: CGFloat {
+        let limit = max(bounds.width - Self.minimumBodyWidth, min(Self.minimumSidebarWidth, floor(bounds.width / 3)))
+        return min(max(sidebarWidth, Self.minimumSidebarWidth), limit)
     }
 
     private func fileURLs(_ info: any NSDraggingInfo) -> [URL] {

@@ -39,6 +39,8 @@ struct TextSettings {
         static let ignoreWhitespace = "prism.text.ignoreWhitespace"
         static let wrapLines = "prism.text.wrapLines"
         static let viewMode = "prism.text.viewMode"
+        static let splitFraction = "prism.text.splitFraction"
+        static let sidebarWidth = "prism.window.sidebarWidth"
     }
 
     static let defaultFontSize: CGFloat = 11
@@ -77,6 +79,26 @@ struct TextSettings {
     var viewMode: ViewMode {
         get { defaults.string(forKey: Key.viewMode).flatMap(ViewMode.init(rawValue:)) ?? .blocks }
         nonmutating set { defaults.set(newValue.rawValue, forKey: Key.viewMode) }
+    }
+
+    /// A's share of the two panes, as last dragged: half until then. Like
+    /// the layout, it applies to new comparisons and posts nothing.
+    var splitFraction: CGFloat {
+        get {
+            let stored = defaults.double(forKey: Key.splitFraction)
+            return stored > 0 && stored < 1 ? CGFloat(stored) : 0.5
+        }
+        nonmutating set { defaults.set(Double(newValue), forKey: Key.splitFraction) }
+    }
+
+    /// The changeset sidebar's width, as last dragged.
+    var sidebarWidth: CGFloat {
+        get {
+            let stored = defaults.double(forKey: Key.sidebarWidth)
+            return stored > 0 ? max(CGFloat(stored), ComparisonContentView.minimumSidebarWidth)
+                              : ComparisonContentView.sidebarWidth
+        }
+        nonmutating set { defaults.set(Double(newValue), forKey: Key.sidebarWidth) }
     }
 
     /// The text font: the chosen face, or the system monospaced font at

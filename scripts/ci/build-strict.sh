@@ -92,12 +92,14 @@ gate build-release swift build -c release "${STRICT[@]}"
 gate build-tests swift build --build-tests "${STRICT[@]}"
 
 # CI runners have no usable display and few CPUs: PRISM_CI_SKIP_APP_TESTS=1
-# skips the AppKit app tests and three timing-sensitive tests there. They run
-# in full on a developer machine (their windows stay invisible).
+# skips the AppKit app tests and four timing-sensitive tests there (a 3-CPU
+# runner shared by every suite misses wall-clock bounds such as a 50 ms
+# cancellation). They run in full on a developer machine (their windows stay
+# invisible).
 TEST_SKIPS=()
 if [[ "${PRISM_CI_SKIP_APP_TESTS:-}" == "1" ]]; then
     TEST_SKIPS=(--skip PrismAppTests
-                --skip 'cancellingTheTaskCancelsAnAsyncDiff|aTricklingClientIsCutOffAtTheDeadline|appIsLaunchedWhenNotRunning')
+                --skip 'cancellingTheTaskCancelsAnAsyncDiff|aTricklingClientIsCutOffAtTheDeadline|appIsLaunchedWhenNotRunning|cancellingAProductionDiffOfA300kLineDisjointPairReturnsWithin50ms')
     echo "notice: PRISM_CI_SKIP_APP_TESTS=1: app and timing-sensitive tests skipped"
 fi
 if run_logged "$LOG_DIR/test.log" swift test "${STRICT[@]}" ${TEST_SKIPS[@]+"${TEST_SKIPS[@]}"}; then

@@ -21,6 +21,15 @@ import Testing
     #expect(ChangesetRows(relativePaths: []).rows.isEmpty)
 }
 
+@Test func collapsedGroupsHideTheirFilesButKeepTheOrder() {
+    let rows = ChangesetRows(relativePaths: ["src/b.c", "README", "docs/x.md", "src/a.c"], collapsed: ["src"])
+    #expect(rows.rows == [.group("Root Path"), .file(1), .group("docs"), .file(2), .group("src")])
+    #expect(rows.entryOrder == [1, 2, 0, 3])
+    #expect(rows.row(ofEntry: 0) == nil)
+    #expect(rows.group(ofEntry: 3) == "src")
+    #expect(rows.group(ofEntry: 1) == "Root Path")
+}
+
 @MainActor
 @Test func changedFileCountText() {
     #expect(ChangesetSidebarView.countText(1) == "1 changed file")
@@ -93,6 +102,57 @@ private func entry(_ path: String, _ status: FileStatus = .changed, leftSnapshot
     #expect(controller.sidebarView.selectedEntry == 2)
     controller.markComplete()
     #expect(controller.isComplete)
+}
+
+@MainActor
+@Test func collapsingAGroupKeepsTheSelectionAndNavigationExpandsIt() throws {
+    _ = NSApplication.shared
+    let fixtureA = Corpus.fixture("text/a.swift").path
+    let fixtureB = Corpus.fixture("text/b.swift").path
+    let document = DocumentContent(
+        id: "doc-10", kind: .changeset, title: "Changes", tool: .git,
+        entries: [entry("one.swift", left: fixtureA, right: fixtureB),
+                  entry("sub/two.swift", left: fixtureB, right: fixtureA)], isComplete: true)
+    let controller = ChangesetWindowController(document: document)
+    defer { controller.close() }
+    let sidebar = controller.sidebarView
+    #expect(sidebar.selectedEntry == 0)
+
+    sidebar.setCollapsed(true, group: "Root Path")
+    #expect(sidebar.isCollapsed("Root Path"))
+    #expect(sidebar.rows.rows == [.group("Root Path"), .group("sub"), .file(1)])
+    #expect(sidebar.selectedEntry == 0)          // still shown on the right
+    #expect(controller.urlA.path == fixtureA)
+
+    sidebar.setCollapsed(true, group: "sub")
+    controller.selectNextFile(nil)               // opens "sub" to show the file
+    #expect(!sidebar.isCollapsed("sub"))
+    #expect(sidebar.selectedEntry == 1)
+    #expect(controller.urlA.path == fixtureB)
+    controller.selectPreviousFile(nil)
+    #expect(!sidebar.isCollapsed("Root Path"))
+    #expect(sidebar.selectedEntry == 0)
+}
+
+@MainActor
+@Test func sidebarWidthFollowsDragWithinLimits() {
+    let content = ComparisonContentView(frame: NSRect(x: 0, y: 0, width: 1000, height: 600))
+    content.sidebar = NSView()
+    var reported: [CGFloat] = []
+    content.onSidebarResize = { reported.append($0) }
+    content.layoutSubtreeIfNeeded()
+    #expect(content.sidebar?.frame.width == ComparisonContentView.sidebarWidth)
+    content.sidebarHandle.onDrag?(400)
+    content.layoutSubtreeIfNeeded()
+    #expect(content.sidebar?.frame.width == 400)
+    content.sidebarHandle.onDrag?(20)
+    #expect(content.sidebarWidth == ComparisonContentView.minimumSidebarWidth)
+    content.sidebarHandle.onDrag?(990)
+    #expect(content.sidebarWidth == 1000 - ComparisonContentView.minimumBodyWidth)
+    content.sidebarHandle.onReset?()
+    #expect(content.sidebarWidth == ComparisonContentView.sidebarWidth)
+    #expect(reported == [400, ComparisonContentView.minimumSidebarWidth, 1000 - ComparisonContentView.minimumBodyWidth,
+                         ComparisonContentView.sidebarWidth])
 }
 
 @Test func compareURLsAcceptOnlyTwoLocalRegularFiles() {

@@ -26,6 +26,10 @@
 #   PRISM_PERF_SCALE=<factor>   multiplies every time budget (default 1; CI
 #                               uses 3 on shared runners). The 130 ms bound
 #                               of the big engine case is absolute.
+#   PRISM_PERF_FOLDER_SCAN_SCALE=<factor>
+#                               multiplies the folder deep-pass budget instead
+#                               (default PRISM_PERF_SCALE; CI uses 8, see
+#                               ci.yml)
 #   PRISM_PERF_SKIP_BUILD=1     use the existing release build
 #   PRISM_FOLDER_GEN=<dir>      where the 200k-file tree lives or is generated
 #                               (default build/folder-gen, shared with M08.sh)
@@ -36,9 +40,10 @@ ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 cd "$ROOT" || exit 1
 
 SCALE="${PRISM_PERF_SCALE:-1}"
+SCAN_SCALE="${PRISM_PERF_FOLDER_SCAN_SCALE:-$SCALE}"
 GEN="${PRISM_FOLDER_GEN:-$ROOT/build/folder-gen}"
 OUT="$ROOT/build/perf"
-readonly SCALE GEN OUT
+readonly SCALE SCAN_SCALE GEN OUT
 mkdir -p "$OUT"
 : > "$OUT/results.txt"
 
@@ -60,7 +65,7 @@ result() {   # result <pass|fail> <description>
     if [[ "$1" == pass ]]; then passed=$((passed + 1)); else word=FAIL; failed=$((failed + 1)); fi
     echo "$word $2" | tee -a "$OUT/results.txt"
 }
-budget() { /usr/bin/python3 -I -c "import sys; print(round(float(sys.argv[1]) * float(sys.argv[2]), 3))" "$1" "$SCALE"; }
+budget() { /usr/bin/python3 -I -c "import sys; print(round(float(sys.argv[1]) * float(sys.argv[2]), 3))" "$1" "${2:-$SCALE}"; }
 
 # bench_lines <log>: one test per PASS/FAIL line of a PrismBench report.
 bench_lines() {
@@ -135,7 +140,7 @@ kill -TERM "$STUB_PID" 2>/dev/null; wait "$STUB_PID" 2>/dev/null; STUB_PID=""
 # --- folder scan (M8) ----------------------------------------------------------------
 echo "-- folder"
 if "$BIN/PrismBench" foldergen "$GEN" > "$OUT/foldergen.log" 2>&1; then
-    "$BIN/PrismBench" folderperf --scale "$SCALE" --expect 14,6,1 "$GEN/left" "$GEN/right" > "$OUT/folder.log" 2>&1
+    "$BIN/PrismBench" folderperf --first-rows-ms "$(budget 50)" --deep-ms "$(budget 2000 "$SCAN_SCALE")" --expect 14,6,1 "$GEN/left" "$GEN/right" > "$OUT/folder.log" 2>&1
     bench_lines "$OUT/folder.log"
     deep=$(cd "$GEN/right" && find top03 -type f -name 'file*' | sort | head -n 1)
     "$BIN/PrismBench" folderwatch --budget-ms "$(budget 200)" --touch "$deep" "$GEN/left" "$GEN/right" \

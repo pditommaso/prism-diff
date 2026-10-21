@@ -193,3 +193,52 @@ private func waitForLoad(_ controller: ComparisonWindowController) async throws 
     settings.ignoreWhitespace = true
     #expect(TextSettings(defaults: defaults).ignoreWhitespace)
 }
+
+@MainActor
+@Test func paneAndSidebarWidthsPersist() throws {
+    let suite = "prism.tests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let settings = TextSettings(defaults: defaults)
+    #expect(settings.splitFraction == 0.5)
+    #expect(settings.sidebarWidth == ComparisonContentView.sidebarWidth)
+    settings.splitFraction = 0.3
+    settings.sidebarWidth = 410
+    #expect(TextSettings(defaults: defaults).splitFraction == 0.3)
+    #expect(TextSettings(defaults: defaults).sidebarWidth == 410)
+    // Out-of-range values fall back.
+    defaults.set(1.5, forKey: TextSettings.Key.splitFraction)
+    defaults.set(10.0, forKey: TextSettings.Key.sidebarWidth)
+    #expect(settings.splitFraction == 0.5)
+    #expect(settings.sidebarWidth == ComparisonContentView.minimumSidebarWidth)
+}
+
+@MainActor
+@Test func dividerDragsBetweenThePanes() throws {
+    let (view, _) = try makeView("a.swift", "b.swift", size: NSSize(width: 1002, height: 700))
+    var changes = 0
+    view.onSplitChange = { changes += 1 }
+    #expect(view.divider.frame.minX == 500)
+    #expect(view.splitX(forWidth: 1002) == 501)
+
+    view.splitHandle.onDrag?(301)
+    view.layoutSubtreeIfNeeded()
+    #expect(view.divider.frame.minX == 300)
+    #expect(view.scrollB.frame.maxX == 1002)
+    #expect(view.splitHandle.frame.midX == view.divider.frame.midX)
+    #expect(changes == 1)
+
+    // Each pane keeps a minimum width.
+    view.splitHandle.onDrag?(0)
+    view.layoutSubtreeIfNeeded()
+    #expect(view.divider.frame.minX == BlocksDiffView.minimumPaneWidth)
+    view.splitHandle.onDrag?(2000)
+    view.layoutSubtreeIfNeeded()
+    #expect(view.divider.frame.maxX == 1002 - BlocksDiffView.minimumPaneWidth)
+
+    view.splitHandle.onReset?()
+    view.layoutSubtreeIfNeeded()
+    #expect(view.divider.frame.minX == 500)
+    view.setMode(.unified)
+    #expect(view.splitHandle.isHidden)
+}

@@ -7,7 +7,7 @@ import PrismProtocol
 
 /// The rows of a changeset sidebar: a group row per folder ("Root Path" for
 /// files at the top level, first), then that folder's files in the order
-/// they arrived.
+/// they arrived. A collapsed group shows no files.
 struct ChangesetRows: Equatable {
     enum Row: Equatable {
         case group(String)
@@ -18,8 +18,11 @@ struct ChangesetRows: Equatable {
     static let rootTitle = "Root Path"
 
     private(set) var rows: [Row] = []
+    /// Entries in display order, collapsed groups included.
+    private(set) var entryOrder: [Int] = []
+    private var groupOfEntry: [Int: String] = [:]
 
-    init(relativePaths: [String]) {
+    init(relativePaths: [String], collapsed: Set<String> = []) {
         var folders: [String: [Int]] = [:]
         for (index, path) in relativePaths.enumerated() {
             folders[Self.folder(of: path), default: []].append(index)
@@ -28,8 +31,12 @@ struct ChangesetRows: Equatable {
             lhs.isEmpty != rhs.isEmpty ? lhs.isEmpty : lhs.localizedStandardCompare(rhs) == .orderedAscending
         }
         for folder in order {
-            rows.append(.group(folder.isEmpty ? Self.rootTitle : folder))
-            rows += folders[folder, default: []].map(Row.file)
+            let title = folder.isEmpty ? Self.rootTitle : folder
+            let files = folders[folder, default: []]
+            rows.append(.group(title))
+            if !collapsed.contains(title) { rows += files.map(Row.file) }
+            entryOrder += files
+            for index in files { groupOfEntry[index] = title }
         }
     }
 
@@ -38,20 +45,21 @@ struct ChangesetRows: Equatable {
         return folder == "." ? "" : folder
     }
 
-    /// The row showing entry `index`.
+    /// The row showing entry `index`, nil when its group is collapsed.
     func row(ofEntry index: Int) -> Int? {
         rows.firstIndex(of: .file(index))
     }
 
-    /// Entries in display order.
-    var entryOrder: [Int] {
-        rows.compactMap { if case .file(let index) = $0 { index } else { nil } }
+    /// The title of the group holding entry `index`.
+    func group(ofEntry index: Int) -> String? {
+        groupOfEntry[index]
     }
 }
 
 /// The left side of a changeset window: a header with the version-control
 /// tool's icon and "N changed files" (with a spinner while files may still
-/// arrive), above a source list of the files with their status.
+/// arrive), above a source list of the files with their status, grouped by
+/// folder. Clicking a folder row collapses or expands it.
 @MainActor
 final class ChangesetSidebarView: NSView, NSTableViewDataSource, NSTableViewDelegate {
     let header = BarView(hairline: .bottom)
@@ -64,6 +72,11 @@ final class ChangesetSidebarView: NSView, NSTableViewDataSource, NSTableViewDele
 
     private(set) var entries: [ChangesetEntry] = []
     private(set) var rows = ChangesetRows(relativePaths: [])
+    /// Titles of the collapsed groups.
+    private(set) var collapsedGroups: Set<String> = []
+    /// The selected entry; it stays selected while its group is collapsed.
+    private(set) var selectedEntry: Int?
+    private var reloading = false
     /// Called with the entry index when the user selects a file.
     var onSelect: ((Int) -> Void)?
 
@@ -92,7 +105,8 @@ final class ChangesetSidebarView: NSView, NSTableViewDataSource, NSTableViewDele
         tableView.floatsGroupRows = false
         tableView.dataSource = self
         tableView.delegate = self
-        tableView.allowsEmptySelection = false
+        tableView.target = self
+        tableView.action = #selector(rowClicked(_:))
         tableView.setAccessibilityIdentifier("prism.changeset.files")
         tableView.setAccessibilityLabel("Changed files")
         scrollView.documentView = tableView
@@ -131,15 +145,37 @@ final class ChangesetSidebarView: NSView, NSTableViewDataSource, NSTableViewDele
     }
 
     func setEntries(_ entries: [ChangesetEntry]) {
-        let selected = selectedEntry
         self.entries = entries
-        rows = ChangesetRows(relativePaths: entries.map(\.relativePath))
         countLabel.stringValue = Self.countText(entries.count)
-        tableView.reloadData()
-        if let selected, let row = rows.row(ofEntry: selected) {
-            tableView.selectRowIndexes([row], byExtendingSelection: false)
-        }
+        reloadRows()
         needsLayout = true
+    }
+
+    /// Rebuilds the rows, keeping the selection without reporting it.
+    private func reloadRows() {
+        rows = ChangesetRows(relativePaths: entries.map(\.relativePath), collapsed: collapsedGroups)
+        reloading = true
+        defer { reloading = false }
+        tableView.reloadData()
+        if let selectedEntry, let row = rows.row(ofEntry: selectedEntry) {
+            tableView.selectRowIndexes([row], byExtendingSelection: false)
+        } else {
+            tableView.deselectAll(nil)
+        }
+    }
+
+    func isCollapsed(_ group: String) -> Bool { collapsedGroups.contains(group) }
+
+    func setCollapsed(_ collapsed: Bool, group: String) {
+        guard collapsed != isCollapsed(group) else { return }
+        if collapsed { collapsedGroups.insert(group) } else { collapsedGroups.remove(group) }
+        reloadRows()
+    }
+
+    @objc private func rowClicked(_ sender: Any?) {
+        let row = tableView.clickedRow
+        guard row >= 0, row < rows.rows.count, case .group(let title) = rows.rows[row] else { return }
+        setCollapsed(!isCollapsed(title), group: title)
     }
 
     func setReceiving(_ receiving: Bool) {
@@ -147,14 +183,9 @@ final class ChangesetSidebarView: NSView, NSTableViewDataSource, NSTableViewDele
         spinner.toolTip = receiving ? "More files may arrive" : nil
     }
 
-    /// The entry of the selected row.
-    var selectedEntry: Int? {
-        let row = tableView.selectedRow
-        guard row >= 0, row < rows.rows.count, case .file(let index) = rows.rows[row] else { return nil }
-        return index
-    }
-
+    /// Selects entry `index`, expanding its group when collapsed.
     func selectEntry(_ index: Int) {
+        if let group = rows.group(ofEntry: index) { setCollapsed(false, group: group) }
         guard let row = rows.row(ofEntry: index) else { return }
         tableView.selectRowIndexes([row], byExtendingSelection: false)
         tableView.scrollRowToVisible(row)
@@ -211,12 +242,7 @@ final class ChangesetSidebarView: NSView, NSTableViewDataSource, NSTableViewDele
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         switch rows.rows[row] {
         case .group(let title):
-            let field = NSTextField(labelWithString: "\u{25CF} \(title)")
-            let italic = NSFontManager.shared.convert(.systemFont(ofSize: NSFont.smallSystemFontSize + 1), toHaveTrait: .italicFontMask)
-            field.font = italic
-            field.textColor = .secondaryLabelColor
-            field.lineBreakMode = .byTruncatingHead
-            return field
+            return groupView(title)
         case .file(let index):
             let entry = entries[index]
             let cell = NSTableCellView()
@@ -243,8 +269,56 @@ final class ChangesetSidebarView: NSView, NSTableViewDataSource, NSTableViewDele
         }
     }
 
+    /// A folder row: a disclosure chevron and a folder icon, open or closed,
+    /// before the folder's path.
+    private func groupView(_ title: String) -> NSView {
+        let collapsed = isCollapsed(title)
+        let cell = NSTableCellView()
+        let chevron = NSImageView(image: NSImage(systemSymbolName: collapsed ? "chevron.right" : "chevron.down",
+                                                 accessibilityDescription: nil) ?? NSImage())
+        chevron.symbolConfiguration = .init(pointSize: 9, weight: .semibold)
+        chevron.contentTintColor = .tertiaryLabelColor
+        let folder = NSImageView(image: NSImage(systemSymbolName: collapsed ? "folder.fill" : "folder",
+                                                accessibilityDescription: nil) ?? NSImage())
+        folder.symbolConfiguration = .init(pointSize: 11, weight: .regular)
+        folder.contentTintColor = .secondaryLabelColor
+        let field = NSTextField(labelWithString: title)
+        field.font = .systemFont(ofSize: NSFont.smallSystemFontSize + 1, weight: .medium)
+        field.textColor = .secondaryLabelColor
+        field.lineBreakMode = .byTruncatingHead
+        field.toolTip = title
+        for view in [chevron, folder, field] as [NSView] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            cell.addSubview(view)
+        }
+        cell.textField = field
+        cell.setAccessibilityLabel("\(title), folder, \(collapsed ? "collapsed" : "expanded")")
+        NSLayoutConstraint.activate([
+            chevron.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+            chevron.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            chevron.widthAnchor.constraint(equalToConstant: 10),
+            folder.leadingAnchor.constraint(equalTo: chevron.trailingAnchor, constant: 4),
+            folder.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            folder.widthAnchor.constraint(equalToConstant: 16),
+            field.leadingAnchor.constraint(equalTo: folder.trailingAnchor, constant: 5),
+            field.trailingAnchor.constraint(lessThanOrEqualTo: cell.trailingAnchor, constant: -4),
+            field.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+        ])
+        return cell
+    }
+
+    /// Keeps a file selected: clicks on empty space do not clear it.
+    func tableView(_ tableView: NSTableView,
+                   selectionIndexesForProposedSelection proposed: IndexSet) -> IndexSet {
+        proposed.isEmpty && !reloading ? tableView.selectedRowIndexes : proposed
+    }
+
     func tableViewSelectionDidChange(_ notification: Notification) {
-        if let entry = selectedEntry { onSelect?(entry) }
+        guard !reloading else { return }
+        let row = tableView.selectedRow
+        guard row >= 0, row < rows.rows.count, case .file(let index) = rows.rows[row] else { return }
+        selectedEntry = index
+        onSelect?(index)
     }
 
     static func statusName(_ status: FileStatus) -> String {
